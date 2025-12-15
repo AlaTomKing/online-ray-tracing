@@ -1,0 +1,153 @@
+<!-- path tracing (or ray tracing but whatever) renderer for roblox -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ro Tom Xtreme</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            background-color: #222;
+        }
+
+        span {
+            color: white;
+        }
+
+        canvas {
+            left: 50%;
+            top: 50%;
+            width: 75%;
+
+            transform: translate(-50%, -50%);
+            position: absolute;
+            background-color: #000;
+            image-rendering: pixelated;
+        }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"
+        integrity="sha512-zhHQR0/H5SEBL3Wn6yYSaTTZej12z0hVZKOv3TwCUXT1z5qeqGcXJLLrbERYRScEDDpYIJhPC1fk31gqR783iQ=="
+        crossorigin="anonymous" defer></script>
+
+    <script src="scripts/gl.js"></script>
+    <script src="scripts/triangulator.js"></script>
+    <script src="scripts/classes.js"></script>
+</head>
+
+<body>
+    <span id="rtx-text">RTX OFF</span><br>
+    <button onclick="start()">Run!</button>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const width = 640;
+        const height = 480;
+
+        const canvas = document.getElementById("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const constantSettings = {
+            maxBounceCount: 10,
+            numOfRaysPerPixel: 10,
+
+            environmentEnabled: true,
+            skyColorHorizon: new Vector3(1, 1, 1),
+            skyColorZenith: new Vector3(0.0788092, 0.36480793, 0.7264151),
+            groundColor: new Vector3(0.35, 0.3, 0.35),
+            sunLightDirection: new Vector3(-0.7419255375862122, 0.539040207862854, -0.39872556924819946),
+            sunFocus: 1,
+            sunColor: new Vector3(1,1,1).mul(10)
+            //sunIntensity: 200;
+        }
+
+        const camera = {
+            //cframe: new CFrame(-58.80168533325195, 11.498377799987793, 21.20304298400879, 0.417350709438324, -0.055860407650470734, -0.9070270657539368, -1.30385160446167e-08, 0.9981089234352112, -0.06146980822086334, 0.9087455868721008, 0.02565448172390461, 0.416561484336853),
+            cframe: new CFrame(-5.654424, 36.058109, 84.670799, 0.522657, 0.235228, 0.819455, 0.000000, 0.961186, -0.275913, -0.852546, 0.144208, 0.502373),
+            nearPlaneZ: -0.1,
+            fieldOfView: 70
+        }
+
+        const currentSettings = {
+            camCframePos: camera.cframe.position,
+            camCframeRight: camera.cframe.rightVector,
+            camCframeUp: camera.cframe.upVector,
+            camCframeLook: camera.cframe.lookVector,
+        }
+
+        const planeHeight = -camera.nearPlaneZ * Math.tan((camera.fieldOfView * 0.5) * (Math.PI / 180)) * 2;
+        const planeWidth = planeHeight * (width / height);
+        currentSettings.viewParams = new Vector3(planeWidth, planeHeight, -camera.nearPlaneZ);
+
+        let glSetup = false;
+
+        /** @type {WebGL2RenderingContext} */
+        let gl, raytracer;
+
+        let vertexShaderContent, fragShaderContent;
+
+        // #region fetching
+        // fetch vertex shader
+        fetch("shaders/vertex.glsl").then((response) => {
+            if (!response.ok) {
+                console.log("response not ok bruv; status: " + response.status);
+            }
+            return response.text();
+        }).then((text) => {
+            console.log("got vertex shader !!!");
+            vertexShaderContent = text;
+            if (fragShaderContent) setupGl();
+        }).catch((error) => {
+            console.log("response error ded ded: " + error.message);
+        });
+
+        // fetch fragment shader
+        fetch("shaders/frag.glsl").then((response) => {
+            if (!response.ok) {
+                console.log("response not ok bruv; status: " + response.status);
+            }
+            return response.text();
+        }).then((text) => {
+            console.log("got fragment shader !!!");
+            fragShaderContent = text;
+            if (vertexShaderContent) setupGl();
+        }).catch((error) => {
+            console.log("response error ded ded: " + error.message);
+        });
+        // #endregion
+
+        const setupGl = () => {
+            gl = initGl(canvas, vertexShaderContent, fragShaderContent);
+            raytracer = new Raytracer(gl);
+            glSetup = true;
+            raytracer.setup(constantSettings);
+            raytracer.build();
+
+            const sphere = raytracer.insert(new Sphere());
+        }
+
+        function start() {
+            const startTime = Date.now();
+            console.log("running...")
+            //gl.clearColor(1, 0, 1, 1);
+            //gl.drawArrays(gl.TRIANGLE_STRIP, 0, 0);
+            raytracer.render(currentSettings);
+            console.log(`done in ${(Date.now() - startTime) / 1000} seconds`);
+        }
+
+        document.onkeypress = function (e) {
+            e = e || window.event;
+            if (e.keyCode === 114 && glSetup) {
+                start();
+                document.getElementById("rtx-text").textContent = "RTX ON"
+            }
+        };
+    </script>
+</body>
+
+</html>
