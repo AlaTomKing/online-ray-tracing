@@ -69,7 +69,7 @@ class Vector3 {
             (this.y * vec.z) - (this.z * vec.y),
             (this.z * vec.x) - (this.x * vec.z),
             (this.x * vec.y) - (this.y * vec.x)
-        )
+        );
     }
 
     lerp(vec, t) {
@@ -77,7 +77,15 @@ class Vector3 {
             this.x + (vec.x - this.x) * t,
             this.y + (vec.y - this.y) * t,
             this.z + (vec.z - this.z) * t
-        )
+        );
+    }
+
+    nlerp(vec, t) {
+        return new Vector3(
+            this.x + (vec.x - this.x) * t,
+            this.y + (vec.y - this.y) * t,
+            this.z + (vec.z - this.z) * t
+        ).unit();
     }
 
     min(vec) {
@@ -154,6 +162,49 @@ class CFrame {
         )
     }
 
+    quaternion() { // convert rotation matrix to quaternion
+        let i, t, a, b, c;
+
+        if (this.rightVector.x + this.upVector.y + this.lookVector.z > 0) {
+            i = 3;
+            t = 1 + this.rightVector.x + this.upVector.y + this.lookVector.z;
+            a = this.upVector.z - this.lookVector.y;
+            b = this.lookVector.x - this.rightVector.z;
+            c = this.rightVector.y - this.upVector.x;
+        } else if (this.rightVector.x >= this.upVector.y && this.rightVector.x >= this.lookVector.z) {
+            i = 0;
+            t = 1 + this.rightVector.x - this.upVector.y - this.lookVector.z;
+            a = this.rightVector.y + this.upVector.x;
+            b = this.rightVector.z + this.lookVector.z;
+            c = this.upVector.z - this.lookVector.y;
+        } else if (this.upVector.y > this.lookVector.z) {
+            i = 1;
+            t = 1 - this.rightVector.x + this.upVector.y - this.lookVector.z;
+            a = this.upVector.x + this.rightVector.y;
+            b = this.lookVector.y + this.upVector.z;
+            c = this.lookVector.x - this.rightVector.z;
+        } else {
+            i = 2;
+            t = 1 - this.rightVector.x - this.upVector.y + this.lookVector.z;
+            a = this.lookVector.x + this.rightVector.z;
+            b = this.lookVector.y + this.upVector.z;
+            c = this.rightVector.y - this.upVector.x;
+        }
+
+        const s = .5 / Math.sqrt(t);
+
+        switch (i) {
+            case 3:
+                return new Quaternion(a * s, b * s, c * s, t * s);
+            case 2:
+                return new Quaternion(a * s, b * s, t * s, c * s);
+            case 1:
+                return new Quaternion(a * s, t * s, b * s, c * s);
+            default:
+                return new Quaternion(t * s, a * s, b * s, c * s);
+        }
+    }
+
     mul(cf) { // i do not know anything about this i just know what to add and multiply
         /*
         - position x-axis: [a_0] * [b_12] + [a_4] * [b_13] + [a_8]  * [b_14] + [a_12]
@@ -191,6 +242,19 @@ class CFrame {
             this.rightVector.z * cf.lookVector.x  + this.upVector.z * cf.lookVector.y  + this.lookVector.z * cf.lookVector.z,
         );
     }
+
+    lerp(cf, t, shortWay) {
+        const cf2 = new CFrame();
+        cf2.position = this.position.lerp(cf.position, t);
+        
+        const cf3 = this.quaternion().slerp(cf.quaternion(), t, shortWay).cframe();
+
+        cf2.rightVector = cf3.rightVector;
+        cf2.upVector = cf3.upVector;
+        cf2.lookVector = cf3.lookVector;
+
+        return cf2;
+    }
 }
 
 class Color3 {
@@ -216,6 +280,98 @@ class Color3 {
 
     toRGB() {
         return [Math.floor(this.r * 255), Math.floor(this.g * 255), Math.floor(this.b * 255)]
+    }
+}
+
+class Quaternion { // i DO NOT know what this is but i need it for something
+    x = 0;
+    y = 0;
+    z = 0;
+    w = 0;
+
+    constructor(x, y, z, w) {
+        this.set(x,y,z,w);
+    }
+
+    set(x, y, z, w) {
+        this.x = x || this.x;
+        this.y = y || this.y;
+        this.z = z || this.z;
+        this.w = w || this.w;
+    }
+
+    slerp(q, t, shortWay) {
+        const dot = this.dot(q);
+        if (shortWay && dot < 0) {
+            return this.scale(-1).slerp(q, t, true);
+        }
+
+        const angle = Math.acos(dot);
+        const first = this.scale(Math.sin((1 - t) * angle));
+        const second = q.scale(Math.sin(t * angle));
+        const division = 1 / Math.sin(angle);
+
+        return first.add(second).scale(division);
+    }
+
+    add(q) {
+        return new Quaternion(this.x + q.x, this.y + q.y, this.z + q.z, this.w + q.w);
+    }
+
+    dot(q) {
+        return this.x * q.x + this.y * q.y + this.z * q.z + this.w * q.w;
+    }
+
+    mul(q) {
+        return new Quaternion(
+            this.w * q.x + this.x * q.w + this.y * q.z - this.z * q.y,
+            this.w * q.y - this.x * q.z + this.y * q.w + this.z * q.x,
+            this.w * q.z + this.x * q.y - this.y * q.x + this.z * q.w,
+            
+            this.w * q.w - this.x * q.x - this.y * q.y - this.z * q.z
+        )
+    }
+
+    pow(x) {
+        return this.ln().scale(x).exp();
+    }
+
+    exp() { // exponential
+        const r = Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+        const et = Math.exp(this.w);
+        const s = r > 0 ? et * Math.sin(r) / r : 0;
+        return new Quaternion(this.x*s,this.y*s,this.z*s,et*Math.cos(r));
+    }
+
+    ln() {
+        const r = Math.sqrt(this.x*this.x+this.y*this.y+this.z*this.z);
+        const t = r > 0 ? Math.atan2(r,this.w)/r : 0;
+        return new Quaternion(this.x * t, this.y * t, this.z * t, 0.5 * Math.log(this.w * this.w + this.x * this.x + this.y * this.y + this.z * this.z));
+    }
+
+    inverse() {
+        const m = this.x*this.x + this.y*this.y + this.z*this.z + this.w*this.w;
+        return new Quaternion(-this.x / m, -this.y / m, -this.z / m, this.w / m);
+    }
+
+    scale(n) {
+        return new Quaternion(this.x*n,this.y*n,this.z*n,this.w*n);
+    }
+
+    cframe() { // convert to cframe (position will be 0)
+        const n = 1 / Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
+
+        const qx = this.x * n;
+        const qy = this.y * n;
+        const qz = this.z * n;
+        const qw = this.w * n;
+
+        return new CFrame(
+            0, 0, 0,
+            1 - 2 * qy * qy - 2 * qz * qz, 2 * qx * qy - 2 * qz * qw, 2 * qx * qz + 2 * qy * qw,
+            2 * qx * qy + 2 * qz * qw, 1 - 2 * qx * qx - 2 * qz * qz, 2 * qy * qz - 2 * qx * qw,
+            2 * qx * qz - 2 * qy * qw, 2 * qy * qz + 2 * qx * qw, 1 - 2 * qx * qx - 2 * qy * qy
+        )
     }
 }
 
@@ -284,7 +440,6 @@ const Color3_RGB = (r, g, b) => new Color3(r / 255, g / 255, b / 255);
 const Triangle_flat = (x, y, z, n) => new Triangle(x, y, z, n, n, n);
 
 const CFrame_angles = (rx = 0, ry = 0, rz = 0) => {
-    // https://en.wikipedia.org/wiki/Rotation_matrix#Basic_3D_rotations
     // this is something else and doesn't work because i tried
     
     /*const rxCFrame = new CFrame(0, 0, 0, 1, 0, 0, 0, Math.cos(rx), Math.sin(rx), 0, -Math.sin(rx), Math.cos(rx));
