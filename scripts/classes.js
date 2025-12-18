@@ -1,85 +1,3 @@
-class Raytracer {
-    objects = [];
-
-    constructor(gl) {
-        /** @type {Webthis.gl2RenderingContext} */
-        this.gl = gl;
-    }
-
-    build() {
-        this.vertexBuffer = this.gl.createBuffer();
-        this.vertexBuffer.itemSize = 2;
-        this.vertexBuffer.numItems = 4;
-
-        const vertices = [
-            -1.0, 1.0,
-            -1.0, -1.0,
-            1.0, 1.0,
-            1.0, -1.0];
-        
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STATIC_DRAW);
-
-        console.log(this.vertexBuffer)
-    }
-
-    setup(settings) {
-        this.gl.shaderProgram.environmentEnabled = this.gl.getUniformLocation(this.gl.shaderProgram, "environmentEnabled");
-
-        this.gl.shaderProgram.sunFocus = this.gl.getUniformLocation(this.gl.shaderProgram, "sunFocus");
-        this.gl.shaderProgram.sunColor = this.gl.getUniformLocation(this.gl.shaderProgram, "sunColor");
-        this.gl.shaderProgram.groundColor = this.gl.getUniformLocation(this.gl.shaderProgram, "groundColor");
-
-        this.gl.shaderProgram.skyColorHorizon = this.gl.getUniformLocation(this.gl.shaderProgram, "skyColorHorizon");
-        this.gl.shaderProgram.skyColorZenith = this.gl.getUniformLocation(this.gl.shaderProgram, "skyColorZenith");
-        this.gl.shaderProgram.sunLightDirection = this.gl.getUniformLocation(this.gl.shaderProgram, "sunLightDirection");
-
-        this.gl.uniform1i(this.gl.shaderProgram.environmentEnabled, settings.environmentEnabled);
-
-        this.gl.uniform1f(this.gl.shaderProgram.sunFocus, settings.sunFocus);
-        this.gl.uniform3f(this.gl.shaderProgram.sunColor, settings.sunColor.x, settings.sunColor.y, settings.sunColor.z);
-        this.gl.uniform3f(this.gl.shaderProgram.groundColor, settings.groundColor.x, settings.groundColor.y, settings.groundColor.z);
-
-        this.gl.uniform3f(this.gl.shaderProgram.skyColorHorizon, settings.skyColorHorizon.x, settings.skyColorHorizon.y, settings.skyColorHorizon.z);
-        this.gl.uniform3f(this.gl.shaderProgram.skyColorZenith, settings.skyColorZenith.x, settings.skyColorZenith.y, settings.skyColorZenith.z);
-        this.gl.uniform3f(this.gl.shaderProgram.sunLightDirection, settings.sunLightDirection.x, settings.sunLightDirection.y, settings.sunLightDirection.z);
-
-        // --------
-
-        this.gl.shaderProgram.viewParams = this.gl.getUniformLocation(this.gl.shaderProgram, "viewParams");
-
-        this.gl.shaderProgram.camCframePos = this.gl.getUniformLocation(this.gl.shaderProgram, "camCframePos");
-        this.gl.shaderProgram.camCframeRight = this.gl.getUniformLocation(this.gl.shaderProgram, "camCframeRight");
-        this.gl.shaderProgram.camCframeUp = this.gl.getUniformLocation(this.gl.shaderProgram, "camCframeUp");
-        this.gl.shaderProgram.camCframeLook = this.gl.getUniformLocation(this.gl.shaderProgram, "camCframeLook");
-
-        this.gl.shaderProgram.camCframe = this.gl.getUniformLocation(this.gl.shaderProgram, "camCframe");
-    }
-
-    render(cSettings) {
-        console.log(cSettings.viewParams)
-
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-        this.gl.vertexAttribPointer(this.gl.shaderProgram.vertexPositionAttribute, this.vertexBuffer.itemSize, this.gl.FLOAT, false, 0, 0);
-
-        this.gl.uniform3f(this.gl.shaderProgram.viewParams, cSettings.viewParams.x, cSettings.viewParams.y, cSettings.viewParams.z);
-
-        this.gl.uniform3f(this.gl.shaderProgram.camCframePos, cSettings.camCframePos.x, cSettings.camCframePos.y, cSettings.camCframePos.z);
-        this.gl.uniform3f(this.gl.shaderProgram.camCframeRight, cSettings.camCframeRight.x, cSettings.camCframeRight.y, cSettings.camCframeRight.z);
-        this.gl.uniform3f(this.gl.shaderProgram.camCframeUp, cSettings.camCframeUp.x, cSettings.camCframeUp.y, cSettings.camCframeUp.z);
-        this.gl.uniform3f(this.gl.shaderProgram.camCframeLook, cSettings.camCframeLook.x, cSettings.camCframeLook.y, cSettings.camCframeLook.z);
-
-        this.gl.uniform
-
-        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, this.vertexBuffer.numItems);
-    }
-
-    insert(object) {
-        this.objects.push(object);
-        return object;
-    }
-}
-
 class Vector3 {
     x = 0; y = 0; z = 0;
 
@@ -180,20 +98,98 @@ class Vector3 {
 }
 
 class CFrame {
-    constructor(px, py, pz, xx, yx, zx, xy, yy, zy, xz, yz, zz) {
-        this.position = new Vector3(px, py, pz);
-        this.rightVector = new Vector3(xx, xy, xz);
-        this.upVector = new Vector3(yx, yy, yz);
-        this.lookVector = new Vector3(zx, zy, zz);
+    constructor(px = 0, py = 0, pz = 0, xx = 1, yx = 0, zx = 0, xy = 0, yy = 1, zy = 0, xz = 0, yz = 0, zz = 1) {
+        if (px instanceof Vector3) {
+            this.position = px;
+            this.rightVector = new Vector3(1, 0, 0);
+            this.upVector = new Vector3(0, 1, 0);
+            this.lookVector = new Vector3(0, 0, 1);
+        } else {
+            this.position = new Vector3(px, py, pz);
+            this.rightVector = new Vector3(xx, xy, xz);
+            this.upVector = new Vector3(yx, yy, yz);
+            this.lookVector = new Vector3(zx, zy, zz);
+        }
     }
 
     static() {
         return [
             this.position.x, this.position.y, this.position.z,
-            this.rightVector.x, this.rightVector.y, this.rightVector.z,
-            this.upVector.x, this.upVector.y, this.upVector.z,
-            this.lookVector.x, this.lookVector.y, this.lookVector.z
+            this.rightVector.x, this.upVector.x, this.lookVector.x,
+            this.rightVector.y, this.upVector.y, this.lookVector.y,
+            this.rightVector.z, this.upVector.z, this.lookVector.z
         ]
+    }
+
+    /*
+    // in columns: rightVector, upVector, lookVector, position
+    [ 0,  4,  8, 12]
+    [ 1,  5,  9, 13]
+    [ 2,  6, 10, 14]
+    [ 3,  7, 11, 15]
+    */
+
+    matrix() { // convert to 4x4 matrix in array
+        return [
+            this.rightVector.x, this.rightVector.y, this.rightVector.z, 0,
+            this.upVector.x,    this.upVector.y,    this.upVector.z,    0,     
+            this.lookVector.x,  this.lookVector.y,  this.lookVector.z,  0,
+            this.position.x,    this.position.y,    this.position.z,    1
+        ]
+    }
+
+    eulerXYZ() { // convert rotation matrix to euler angles in (xyz)
+        return new Vector3(
+            Math.atan2(-this.lookVector.y, this.lookVector.z),
+            Math.asin(this.lookVector.x),
+            Math.atan2(-this.upVector.x, this.rightVector.x)
+        )
+    }
+
+    eulerYXZ() { // convert rotation matrix to euler angles in (yxz)
+        return new Vector3(
+            Math.asin(-this.lookVector.y),
+            Math.atan2(this.lookVector.x, this.lookVector.z),
+            Math.atan2(this.rightVector.y, this.upVector.y)
+        )
+    }
+
+    mul(cf) { // i do not know anything about this i just know what to add and multiply
+        /*
+        - position x-axis: [a_0] * [b_12] + [a_4] * [b_13] + [a_8]  * [b_14] + [a_12]
+        - position y-axis: [a_1] * [b_12] + [a_5] * [b_13] + [a_9]  * [b_14] + [a_13]
+        - position z-axis: [a_2] * [b_12] + [a_6] * [b_13] + [a_10] * [b_14] + [a_14]
+
+        - rightVector x-axis: [a_0] * [b_0] + [a_4] * [b_1] + [a_8] * [b_2]
+        - upVector    x-axis: [a_0] * [b_4] + [a_4] * [b_5] + [a_8] * [b_6]
+        - lookVector  x-axis: [a_0] * [b_8] + [a_4] * [b_9] + [a_8] * [b_10]
+
+        - rightVector y-axis: [a_1] * [b_0] + [a_5] * [b_1] + [a_9] * [b_2]
+        - upVector    y-axis: [a_1] * [b_4] + [a_5] * [b_5] + [a_9] * [b_6]
+        - lookVector  y-axis: [a_1] * [b_8] + [a_5] * [b_9] + [a_9] * [b_10]
+
+        - rightVector z-axis: [a_2] * [b_0] + [a_6] * [b_1] + [a_10] * [b_2]
+        - upVector    z-axis: [a_2] * [b_4] + [a_6] * [b_5] + [a_10] * [b_6]
+        - lookVector  z-axis: [a_2] * [b_8] + [a_6] * [b_9] + [a_10] * [b_10]
+        */
+
+        return new CFrame(
+            this.rightVector.x * cf.position.x    + this.upVector.x * cf.position.y    + this.lookVector.x * cf.position.z + this.position.x,
+            this.rightVector.y * cf.position.x    + this.upVector.y * cf.position.y    + this.lookVector.y * cf.position.z + this.position.y,
+            this.rightVector.z * cf.position.x    + this.upVector.z * cf.position.y    + this.lookVector.z * cf.position.z + this.position.z,
+
+            this.rightVector.x * cf.rightVector.x + this.upVector.x * cf.rightVector.y + this.lookVector.x * cf.rightVector.z,
+            this.rightVector.x * cf.upVector.x    + this.upVector.x * cf.upVector.y    + this.lookVector.x * cf.upVector.z,
+            this.rightVector.x * cf.lookVector.x  + this.upVector.x * cf.lookVector.y  + this.lookVector.x * cf.lookVector.z,
+
+            this.rightVector.y * cf.rightVector.x + this.upVector.y * cf.rightVector.y + this.lookVector.y * cf.rightVector.z,
+            this.rightVector.y * cf.upVector.x    + this.upVector.y * cf.upVector.y    + this.lookVector.y * cf.upVector.z,
+            this.rightVector.y * cf.lookVector.x  + this.upVector.y * cf.lookVector.y  + this.lookVector.y * cf.lookVector.z,
+
+            this.rightVector.z * cf.rightVector.x + this.upVector.z * cf.rightVector.y + this.lookVector.z * cf.rightVector.z,
+            this.rightVector.z * cf.upVector.x    + this.upVector.z * cf.upVector.y    + this.lookVector.z * cf.upVector.z,
+            this.rightVector.z * cf.lookVector.x  + this.upVector.z * cf.lookVector.y  + this.lookVector.z * cf.lookVector.z,
+        );
     }
 }
 
@@ -248,11 +244,29 @@ class Material {
 
     emissionColor = new Color3();
     emissionStrength = 0;
+
+    objectify() {
+        return {
+            color: this.color.static(),
+            smoothness: this.smoothness,
+            emissionColor: this.emissionColor.static(),
+            emissionStrength: this.emissionStrength
+        }
+    }
 }
 
 class Sphere {
     radius = 1;
     position = new Vector3();
+    material = new Material();
+
+    objectify() {
+        return {
+            radius: this.radius, 
+            position: this.position.static(),
+            material: this.material.objectify()
+        }
+    }
 }
 
 class Mesh {
@@ -260,6 +274,26 @@ class Mesh {
     material = new Material();
 }
 
+const rad = (x) => x * Math.PI / 180;
+const deg = (x) => x * 180 / Math.PI;
+
+const clamp = (x, min, max) => Math.min(Math.max(x, min), max);
+
 const Vector3_num = (x) => new Vector3(x, x, x);
 const Color3_RGB = (r, g, b) => new Color3(r / 255, g / 255, b / 255);
 const Triangle_flat = (x, y, z, n) => new Triangle(x, y, z, n, n, n);
+
+const CFrame_angles = (rx = 0, ry = 0, rz = 0) => {
+    // https://en.wikipedia.org/wiki/Rotation_matrix#Basic_3D_rotations
+    // this is something else and doesn't work because i tried
+    
+    /*const rxCFrame = new CFrame(0, 0, 0, 1, 0, 0, 0, Math.cos(rx), Math.sin(rx), 0, -Math.sin(rx), Math.cos(rx));
+    const ryCFrame = new CFrame(0, 0, 0, Math.cos(ry), 0, -Math.sin(ry), 0, 1, 0, Math.sin(ry), 0, Math.cos(ry));
+    const rzCFrame = new CFrame(0, 0, 0, Math.cos(rz), Math.sin(rz), 0, -Math.sin(rz), Math.cos(rz), 0, 0, 0, 1);*/
+
+    const rxCFrame = new CFrame(0, 0, 0, 1, 0, 0, 0, Math.cos(rx), -Math.sin(rx), 0, Math.sin(rx), Math.cos(rx)) // roll
+    const ryCFrame = new CFrame(0, 0, 0, Math.cos(ry), 0, Math.sin(ry), 0, 1, 0, -Math.sin(ry), 0, Math.cos(ry)); // pitch
+    const rzCFrame = new CFrame(0, 0, 0, Math.cos(rz), -Math.sin(rz), 0, Math.sin(rz), Math.cos(rz), 0, 0, 0, 1); // yaw
+
+    return rxCFrame.mul(ryCFrame).mul(rzCFrame);
+}

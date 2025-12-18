@@ -7,6 +7,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ro Tom Xtreme</title>
+    <link rel="icon" type="image/x-icon" href="https://avatars.githubusercontent.com/u/89712796?v=4&size=32" />
+
     <style>
         body {
             font-family: sans-serif;
@@ -23,130 +25,238 @@
             top: 50%;
             width: 75%;
 
+            background-image: url("resource/checkerboard.png");
+
             transform: translate(-50%, -50%);
+            filter: blur(0px);
             position: absolute;
             background-color: #000;
             image-rendering: pixelated;
         }
     </style>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"
-        integrity="sha512-zhHQR0/H5SEBL3Wn6yYSaTTZej12z0hVZKOv3TwCUXT1z5qeqGcXJLLrbERYRScEDDpYIJhPC1fk31gqR783iQ=="
-        crossorigin="anonymous" defer></script>
-
-    <script src="scripts/gl.js"></script>
-    <script src="scripts/triangulator.js"></script>
+    <!--<script type="module" src="scripts/webgpu.js"></script>
+    <script type="module" src="scripts/raytracer.js"></script>-->
     <script src="scripts/classes.js"></script>
 </head>
 
 <body>
     <span id="rtx-text">RTX OFF</span><br>
-    <button onclick="start()">Run!</button>
+    <button id="start">Run!</button>
     <canvas id="canvas"></canvas>
 
     <script>
-        const width = 640;
-        const height = 480;
+        /*const width = 2880/2;
+        const height = 2160/2;*/
+
+        const width = 160 * 2;
+        const height = 120 * 2;
 
         const canvas = document.getElementById("canvas");
         canvas.width = width;
         canvas.height = height;
 
+        let currentFrame = 0;
+        const animate = true;
+
         const constantSettings = {
-            maxBounceCount: 10,
-            numOfRaysPerPixel: 10,
+            maxBounceCount: 24,
+            numOfRaysPerPixel: 48,
 
             environmentEnabled: true,
-            skyColorHorizon: new Vector3(1, 1, 1),
-            skyColorZenith: new Vector3(0.0788092, 0.36480793, 0.7264151),
-            groundColor: new Vector3(0.35, 0.3, 0.35),
+            skyColorHorizon: new Color3(1, 1, 1),
+            skyColorZenith: new Color3(0.0788092, 0.36480793, 0.7264151),
+            groundColor: new Color3(0.35, 0.3, 0.35),
             sunLightDirection: new Vector3(-0.7419255375862122, 0.539040207862854, -0.39872556924819946),
-            sunFocus: 1,
-            sunColor: new Vector3(1,1,1).mul(10)
+            sunFocus: 5,
+            sunColor: new Vector3(1, 1, 1).mul(200)
             //sunIntensity: 200;
         }
 
         const camera = {
             //cframe: new CFrame(-58.80168533325195, 11.498377799987793, 21.20304298400879, 0.417350709438324, -0.055860407650470734, -0.9070270657539368, -1.30385160446167e-08, 0.9981089234352112, -0.06146980822086334, 0.9087455868721008, 0.02565448172390461, 0.416561484336853),
-            cframe: new CFrame(-5.654424, 36.058109, 84.670799, 0.522657, 0.235228, 0.819455, 0.000000, 0.961186, -0.275913, -0.852546, 0.144208, 0.502373),
+            //cframe: new CFrame(-5.654424, 36.058109, 84.670799, 0.522657, 0.235228, 0.819455, 0.000000, 0.961186, -0.275913, -0.852546, 0.144208, 0.502373),
+            //cframe: new CFrame(-29.545618, 13.324420, 3.823497, -0.819215, -0.090213, 0.566355, 0.000000, 0.987554, 0.157307, -0.573491, 0.128866, -0.809018),
+            //cframe: new CFrame(-20.973677, 0.773714, 41.303864, 0.514106, 0.159496, 0.842773, 0.000000, 0.982562, -0.185950, -0.857731, 0.095598, 0.505143),
+            cframe: new CFrame(-24.273811, 25.471079, -3.335356, -0.800623, -0.278370, 0.530578, -0.000000, 0.885524, 0.464594, -0.599168, 0.371965, -0.708971),
             nearPlaneZ: -0.1,
             fieldOfView: 70
         }
 
         const currentSettings = {
-            camCframePos: camera.cframe.position,
-            camCframeRight: camera.cframe.rightVector,
-            camCframeUp: camera.cframe.upVector,
-            camCframeLook: camera.cframe.lookVector,
+            camCFrame: camera.cframe
         }
 
         const planeHeight = -camera.nearPlaneZ * Math.tan((camera.fieldOfView * 0.5) * (Math.PI / 180)) * 2;
         const planeWidth = planeHeight * (width / height);
         currentSettings.viewParams = new Vector3(planeWidth, planeHeight, -camera.nearPlaneZ);
 
-        let glSetup = false;
+        let gpuSetup = false;
+        let running = false;
+        let mouseLock = false;
+    </script>
+
+    <script type="module">
+        import { initGpu } from "./scripts/webgpu.js";
+        import { Raytracer } from "./scripts/raytracer.js";
+        import { runTriangulator } from "./scripts/triangulator.js";
 
         /** @type {WebGL2RenderingContext} */
-        let gl, raytracer;
+        let gpu, raytracer;
 
-        let vertexShaderContent, fragShaderContent;
+        const setupGpu = async () => {
+            gpuSetup = true;
 
-        // #region fetching
-        // fetch vertex shader
-        fetch("shaders/vertex.glsl").then((response) => {
-            if (!response.ok) {
-                console.log("response not ok bruv; status: " + response.status);
-            }
-            return response.text();
-        }).then((text) => {
-            console.log("got vertex shader !!!");
-            vertexShaderContent = text;
-            if (fragShaderContent) setupGl();
-        }).catch((error) => {
-            console.log("response error ded ded: " + error.message);
-        });
+            gpu = await initGpu(canvas, false);
 
-        // fetch fragment shader
-        fetch("shaders/frag.glsl").then((response) => {
-            if (!response.ok) {
-                console.log("response not ok bruv; status: " + response.status);
-            }
-            return response.text();
-        }).then((text) => {
-            console.log("got fragment shader !!!");
-            fragShaderContent = text;
-            if (vertexShaderContent) setupGl();
-        }).catch((error) => {
-            console.log("response error ded ded: " + error.message);
-        });
-        // #endregion
-
-        const setupGl = () => {
-            gl = initGl(canvas, vertexShaderContent, fragShaderContent);
-            raytracer = new Raytracer(gl);
-            glSetup = true;
+            raytracer = new Raytracer(gpu);
             raytracer.setup(constantSettings);
-            raytracer.build();
 
-            const sphere = raytracer.insert(new Sphere());
+            raytracer.objects = await runTriangulator("./part_info.json");
+
+            raytracer.build();
+        }
+
+        let lastTime = 0;
+
+        function run(timestamp) {
+            //const startTime = Date.now();
+            //console.log("running...")
+
+            const deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            processCameraMovement(deltaTime);
+
+            raytracer.update(currentSettings, currentFrame);
+            raytracer.render();
+
+            currentFrame++;
+
+            if (animate) requestAnimationFrame(run);
+            //console.log(`done in ${(Date.now() - startTime) / 1000} seconds`);
         }
 
         function start() {
-            const startTime = Date.now();
-            console.log("running...")
-            //gl.clearColor(1, 0, 1, 1);
-            //gl.drawArrays(gl.TRIANGLE_STRIP, 0, 0);
-            raytracer.render(currentSettings);
-            console.log(`done in ${(Date.now() - startTime) / 1000} seconds`);
+            if (!running) {
+                running = true;
+                run();
+            }
         }
+
+        canvas.addEventListener("click", async () => {
+            if (running) {
+                await canvas.requestPointerLock();
+            }
+        });
 
         document.onkeypress = function (e) {
             e = e || window.event;
-            if (e.keyCode === 114 && glSetup) {
+            if (window.event.key === 'r' && gpuSetup) { // r
                 start();
                 document.getElementById("rtx-text").textContent = "RTX ON"
             }
         };
+
+        document.addEventListener("pointerlockchange", () => {
+            mouseLock = document.pointerLockElement === canvas;
+        });
+
+        const btn = document.getElementById("start");
+        btn.onclick = start;
+
+        await setupGpu();
+    </script>
+
+    <script>
+        // camera script
+
+        const cameraSpeed = 1.2;
+        const shiftSpeed = 0.4;
+        const speedIncrease = 3;
+        const mouseSensitivity = 2;
+        const mouseWheelSpeed = 15;
+
+        let currentCFrame = currentSettings.camCFrame;
+        let currentCamPos = currentCFrame.position;
+
+        let eulerAngles = currentCFrame.eulerYXZ();
+        let pitch = deg(eulerAngles.x);
+        let yaw = deg(eulerAngles.y);
+
+        //console.log(deg(eulerAngles.x), deg(eulerAngles.y), deg(eulerAngles.z))
+
+        let w, s, a, d, q, e, shift, space;
+        let speedRate = 1;
+
+        document.onkeydown = (ev) => {
+            if (!ev.repeat) {
+                if (ev.key.toLowerCase() === 'w') w = true;
+                else if (ev.key.toLowerCase() === 's') s = true;
+                else if (ev.key.toLowerCase() === 'a') a = true;
+                else if (ev.key.toLowerCase() === 'd') d = true;
+                else if (ev.key.toLowerCase() === 'q') q = true;
+                else if (ev.key.toLowerCase() === 'e') e = true;
+                else if (ev.key === ' ') space = true;
+                else if (ev.key === 'Shift') shift = true;
+            }
+        }
+
+        document.onkeyup = (ev) => {
+            ev = ev || window.event;
+            if (ev.key.toLowerCase() === 'w') w = false;
+            else if (ev.key.toLowerCase() === 's') s = false;
+            else if (ev.key.toLowerCase() === 'a') a = false;
+            else if (ev.key.toLowerCase() === 'd') d = false;
+            else if (ev.key.toLowerCase() === 'q') q = false;
+            else if (ev.key.toLowerCase() === 'e') e = false;
+            else if (ev.key === ' ') space = false;
+            else if (ev.key === 'Shift') shift = false;
+        }
+
+        let deltaX, deltaY, move;
+        document.addEventListener("mousemove", (e) => {
+            deltaX = e.movementX;
+            deltaY = e.movementY;
+
+            //console.log(deltaX, deltaY)
+            
+            move = !(deltaX === 0 && deltaY === 0);
+        });
+
+        const processCameraMovement = (deltaTime) => {
+            if (mouseLock) {
+                if (space && !shift)
+                    speedRate = speedIncrease;
+                else if (!space && shift)
+                    speedRate = shiftSpeed;
+                else if ((space && shift) || !(space && shift))
+                    speedRate = 1;
+
+                let velocity = new Vector3();
+
+                if (w) velocity = velocity.sub(currentCFrame.lookVector); // look vector is in reverse but ill change that later
+                if (s) velocity = velocity.add(currentCFrame.lookVector);
+                if (d) velocity = velocity.add(currentCFrame.rightVector);
+                if (a) velocity = velocity.sub(currentCFrame.rightVector);
+                if (e) velocity = velocity.add(currentCFrame.upVector);
+                if (q) velocity = velocity.sub(currentCFrame.upVector);
+
+                if (move) {
+                    pitch = clamp(pitch - deltaY * mouseSensitivity * deltaTime * 25, -90, 90);
+                    yaw -= deltaX * mouseSensitivity * deltaTime * 25;
+                }
+
+                velocity = velocity.unit().mul(cameraSpeed * deltaTime * 25 * speedRate);
+                
+                currentCamPos = currentCamPos.add(velocity);
+                currentCFrame = new CFrame(currentCamPos).mul(CFrame_angles(0, rad(yaw), 0)).mul(CFrame_angles(rad(pitch), 0, 0));
+            }
+
+            currentSettings.camCFrame = currentCFrame;
+
+            //currentSettings.camCFrame.position = currentSettings.camCFrame.position.lerp(currentCamPos, 0.2)
+        }
     </script>
 </body>
 

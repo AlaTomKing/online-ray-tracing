@@ -4,13 +4,32 @@
 // that the shader can read
 
 // creates triangle but no smoothing though
-const runTriangulator = (json) => {
-    const materialArrays = []
+export const runTriangulator = async (jsonPath) => {
+    const materialArrays = [];
+    const objects = [];
+
+    let json;
+
+    await fetch(jsonPath).then((response) => {
+        if (!response.ok) {
+            console.log("response not ok bruv; status: " + response.status);
+        }
+        return response.json();
+    }).then((jsonContent) => {
+        console.log("got json!");
+        json = jsonContent;
+    }).catch((error) => {
+        console.log("response error ded ded: " + error.message);
+    });
+
+    console.log(json)
+
     json.forEach(part => {
-        const materialTable = [part.color[0], part.color[1], part.color[2],
-        part.emissionColor[0], part.emissionColor[1], part.emissionColor[2],
-        part.emissionStrength,
-        part.reflectance]
+        const materialTable = new Material();
+        materialTable.color = new Color3(part.color[0], part.color[1], part.color[2]);
+        materialTable.smoothness = part.reflectance;
+        materialTable.emissionColor = new Color3(part.emissionColor[0], part.emissionColor[1], part.emissionColor[2]);
+        materialTable.emissionStrength = part.emissionStrength;
 
         let i;
 
@@ -34,13 +53,8 @@ const runTriangulator = (json) => {
             const sphere = new Sphere();
             sphere.radius = part.size[0] / 2,
             sphere.position.set(part.cframe[0], part.cframe[1], part.cframe[2])
-            insertTable(spheres, [
-                part.cframe[0], 
-                part.cframe[1], 
-                part.cframe[2],
-                part.size[0] / 2,
-                i
-            ]);
+            sphere.material = materialTable
+            objects.push(sphere);
         } else if (part.shape === "Block") {
             const frontNormal = new Vector3(part.cframe[9], part.cframe[10], part.cframe[11]);
             const upNormal = new Vector3(part.cframe[6], part.cframe[7], part.cframe[8]);
@@ -89,10 +103,5 @@ const runTriangulator = (json) => {
         }
     });
 
-    console.log(materialArrays);
-    for (let i = 0; i < materialArrays.length; i++) {
-        for (let j = 0; j < materialArrays[i].length; j++) {
-            materials.push(materialArrays[i][j]);
-        }
-    }
+    return objects;
 }

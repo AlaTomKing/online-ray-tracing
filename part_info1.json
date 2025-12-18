@@ -68,7 +68,7 @@
         ]
     },
     {
-        "emissionStrength": 2,
+        "emissionStrength": 0,
         "reflectance": 0,
         "emissionColor": [
             1,
