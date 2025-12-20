@@ -103,6 +103,10 @@ class Vector3 {
             Math.max(this.z, vec.z)
         )
     }
+
+    equals(vec) {
+        return this.x === vec.x && this.y === vec.y && this.z === vec.z;
+    }
 }
 
 class CFrame {
@@ -255,6 +259,13 @@ class CFrame {
 
         return cf2;
     }
+
+    equals(cf) {
+        return this.position.equals(cf.position)
+            && this.rightVector.equals(cf.rightVector)
+            && this.upVector.equals(cf.upVector)
+            && this.lookVector.equals(cf.lookVector);
+    }
 }
 
 class Color3 {
@@ -301,7 +312,7 @@ class Quaternion { // i DO NOT know what this is but i need it for something
     }
 
     slerp(q, t, shortWay) {
-        const dot = this.dot(q);
+        /*const dot = this.dot(q);
         if (shortWay && dot < 0) {
             return this.scale(-1).slerp(q, t, true);
         }
@@ -311,7 +322,9 @@ class Quaternion { // i DO NOT know what this is but i need it for something
         const second = q.scale(Math.sin(t * angle));
         const division = 1 / Math.sin(angle);
 
-        return first.add(second).scale(division);
+        return first.add(second).scale(division);*/
+
+        return q.mul(this.pow(-1)).pow(t).mul(this);
     }
 
     add(q) {
@@ -380,17 +393,28 @@ class Triangle {
     posB = new Vector3();
     posC = new Vector3();
 
-    triA = new Vector3();
-    triB = new Vector3();
-    triC = new Vector3();
+    normA = new Vector3();
+    normB = new Vector3();
+    normC = new Vector3();
 
-    constructor(posA, posB, posC, triA, triB, triC) {
+    constructor(posA, posB, posC, normA, normB, normC) {
         this.posA = posA || this.posA;
         this.posB = posB || this.posB;
         this.posC = posC || this.posC;
-        this.triA = triA || this.triA;
-        this.triB = triB || this.triB;
-        this.triC = triC || this.triC;
+        this.normA = normA || this.normA;
+        this.normB = normB || this.normB;
+        this.normC = normC || this.normC;
+    }
+
+    objectify() {
+        return {
+            posA: this.posA.static(),
+            posB: this.posB.static(),
+            posC: this.posC.static(),
+            normA: this.normA.static(),
+            normB: this.normB.static(),
+            normC: this.normC.static()
+        }
     }
 }
 
@@ -425,10 +449,76 @@ class Sphere {
     }
 }
 
-class Mesh {
+class Block {
+    position = new Vector3();
+    rotation = new Vector3();
+    size = new Vector3();
+    material = new Material();
+
+    cframe() { // combine position and rotation to make cframe
+        return new CFrame(this.position).mul(CFrame_angles(this.rotation));
+    }
+
+    setCFrame(cf) { // set position and rotation from cframe
+        this.position = cf.position;
+        this.rotation = cf.eulerXYZ();
+    }
+
+    info() { // return objectified triangles and material in tuples
+        // tringalingaling
+
+        const triangles = [];
+        const cframe = this.cframe();
+        
+        const frontNormal = cframe.lookVector.neg();
+        const upNormal = cframe.upVector;
+        const rightNormal = cframe.rightVector;
+
+        const front = frontNormal.mul(this.size.z).div(2);
+        const up = upNormal.mul(this.size.y).div(2);
+        const right = rightNormal.mul(this.size.x).div(2);
+
+        const a = this.position.add(up).add(front).sub(right);
+        const b = this.position.add(up).add(front).add(right);
+        const c = this.position.add(up).sub(front).sub(right);
+        const d = this.position.add(up).sub(front).add(right);
+        const e = this.position.sub(up).add(front).sub(right);
+        const f = this.position.sub(up).add(front).add(right);
+        const g = this.position.sub(up).sub(front).sub(right);
+        const h = this.position.sub(up).sub(front).add(right);
+
+        //TOP NORMAL: ABC, BCD
+        triangles.push(Triangle_flat(a, c, b, upNormal).objectify());
+        triangles.push(Triangle_flat(b, c, d, upNormal).objectify());
+
+        //BOTTOM NORMAL: EFG, FGH
+        triangles.push(Triangle_flat(e, f, g, upNormal.neg()).objectify());
+        triangles.push(Triangle_flat(f, h, g, upNormal.neg()).objectify());
+
+        //FRONT NORMAL: ABE, BEF
+        triangles.push(Triangle_flat(a, b, e, frontNormal).objectify());
+        triangles.push(Triangle_flat(b, f, e, frontNormal).objectify());
+
+        //BACK NORMAL: CDG, DGH
+        triangles.push(Triangle_flat(c, g, d, frontNormal.neg()).objectify());
+        triangles.push(Triangle_flat(d, g, h, frontNormal.neg()).objectify());
+
+        //LEFT NORMAL: ACE, CEG
+        triangles.push(Triangle_flat(a, e, c, rightNormal.neg()).objectify());
+        triangles.push(Triangle_flat(c, e, g, rightNormal.neg()).objectify());
+
+        //RIGHT NORMAL: BDF, DFH
+        triangles.push(Triangle_flat(b, d, f, rightNormal).objectify());
+        triangles.push(Triangle_flat(d, h, f, rightNormal).objectify());
+
+        return [triangles, this.material.objectify()];
+    }
+}
+
+/*class Mesh {
     triangles = [];
     material = new Material();
-}
+}*/
 
 const rad = (x) => x * Math.PI / 180;
 const deg = (x) => x * 180 / Math.PI;
@@ -445,6 +535,12 @@ const CFrame_angles = (rx = 0, ry = 0, rz = 0) => {
     /*const rxCFrame = new CFrame(0, 0, 0, 1, 0, 0, 0, Math.cos(rx), Math.sin(rx), 0, -Math.sin(rx), Math.cos(rx));
     const ryCFrame = new CFrame(0, 0, 0, Math.cos(ry), 0, -Math.sin(ry), 0, 1, 0, Math.sin(ry), 0, Math.cos(ry));
     const rzCFrame = new CFrame(0, 0, 0, Math.cos(rz), Math.sin(rz), 0, -Math.sin(rz), Math.cos(rz), 0, 0, 0, 1);*/
+
+    if (rx instanceof Vector3) {
+        rz = rx.z;
+        ry = rx.y;
+        rx = rx.x;
+    }
 
     const rxCFrame = new CFrame(0, 0, 0, 1, 0, 0, 0, Math.cos(rx), -Math.sin(rx), 0, Math.sin(rx), Math.cos(rx)) // roll
     const ryCFrame = new CFrame(0, 0, 0, Math.cos(ry), 0, Math.sin(ry), 0, 1, 0, -Math.sin(ry), 0, Math.cos(ry)); // pitch

@@ -6,31 +6,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ro Tom Xtreme</title>
+    <title>online ray tracing - AlaTomKing</title>
     <link rel="icon" type="image/x-icon" href="https://avatars.githubusercontent.com/u/89712796?v=4&size=32" />
 
     <style>
         body {
             font-family: sans-serif;
             margin: 0;
-            background-color: #222;
+            background-color: #000;
+            /*overflow: hidden;*/
         }
 
         span {
             color: white;
         }
 
-        canvas {
+        #frame {
+            position: fixed;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+
+            z-index: -99;
+        }
+
+        #background {
+            position: fixed;
+
+            background-color: hotpink;
+
+            image-rendering: pixelated;
+
+            z-index: -100;
+        }
+
+        #canvas {
             left: 50%;
             top: 50%;
             width: 75%;
 
-            background-image: url("resource/checkerboard.png");
-
             transform: translate(-50%, -50%);
             filter: blur(0px);
             position: absolute;
-            background-color: #000;
+            background-color: #0000;
+            border: solid calc(100vw + 100vh) #222f;
             image-rendering: pixelated;
         }
     </style>
@@ -41,27 +60,85 @@
 </head>
 
 <body>
-    <span id="rtx-text">RTX OFF</span><br>
+    <canvas id="background"></canvas>
+    <div id="frame"><canvas id="canvas"></canvas></div>
+
+    <span id="rtx-text">ray tracer is off</span><br>
     <button id="start">Run!</button>
-    <canvas id="canvas"></canvas>
+
+    <!-- background -->
+    <script>
+        (() => {
+            const canvas = document.querySelector("#background");
+            /** @type {CanvasRenderingContext2D} */ const ctx = canvas.getContext("2d");
+
+            const tileSize = 8;
+
+            canvas.width = window.screen.width;
+            canvas.height = window.screen.height;
+
+            for (let x = 0; x < canvas.width / tileSize; x++) {
+                for (let y = 0; y < canvas.height / tileSize; y++) {
+                    const t = (x + y) % 2 == 0 ? "#777" : "#666";
+                    ctx.fillStyle = t;
+                    ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                }
+            }
+
+            let screenX = window.screenX, screenY = window.screenY;
+
+            const resize = () => {
+                canvas.style.width = (window.screen.width / visualViewport.scale) + "px";
+                canvas.style.height = (window.screen.height / visualViewport.scale) + "px";
+
+                canvas.style.left = (visualViewport.offsetLeft - (window.screenX / visualViewport.scale)) + "px";
+                canvas.style.top = (visualViewport.offsetTop - (window.screenY / visualViewport.scale)) + "px";
+            }
+
+            const detectMovement = () => {
+                if (window.screenX !== screenX || window.screenY !== screenY) {
+                    resize();
+                    screenX = window.screenX;
+                    screenY = window.screenY;
+                }
+
+                requestAnimationFrame(detectMovement);
+            }
+
+            //window.addEventListener("wheel", resize);
+
+            visualViewport.onscroll = resize;
+            window.addEventListener("resize", resize);
+
+            detectMovement();
+
+            resize();
+        })();
+    </script>
 
     <script>
         /*const width = 2880/2;
         const height = 2160/2;*/
 
-        const width = 160 * 2;
-        const height = 120 * 2;
+        // #region test
+
+        // #endregion
+
+        const width = 160*8;
+        const height = 120*8;
 
         const canvas = document.getElementById("canvas");
         canvas.width = width;
         canvas.height = height;
 
         let currentFrame = 0;
-        const animate = true;
+        const animate = false;
 
         const constantSettings = {
-            maxBounceCount: 24,
-            numOfRaysPerPixel: 48,
+            crapRender: false, // for viewport purposes
+
+            maxBounceCount: 16,
+            numOfRaysPerPixel: 16,
 
             environmentEnabled: true,
             skyColorHorizon: new Color3(1, 1, 1),
@@ -69,7 +146,7 @@
             groundColor: new Color3(0.35, 0.3, 0.35),
             sunLightDirection: new Vector3(-0.7419255375862122, 0.539040207862854, -0.39872556924819946),
             sunFocus: 5,
-            sunColor: new Vector3(1, 1, 1).mul(200)
+            sunColor: new Vector3(1, 1, 1).mul(50)
             //sunIntensity: 200;
         }
 
@@ -78,9 +155,14 @@
             //cframe: new CFrame(-5.654424, 36.058109, 84.670799, 0.522657, 0.235228, 0.819455, 0.000000, 0.961186, -0.275913, -0.852546, 0.144208, 0.502373),
             //cframe: new CFrame(-29.545618, 13.324420, 3.823497, -0.819215, -0.090213, 0.566355, 0.000000, 0.987554, 0.157307, -0.573491, 0.128866, -0.809018),
             //cframe: new CFrame(-20.973677, 0.773714, 41.303864, 0.514106, 0.159496, 0.842773, 0.000000, 0.982562, -0.185950, -0.857731, 0.095598, 0.505143),
-            cframe: new CFrame(-24.273811, 25.471079, -3.335356, -0.800623, -0.278370, 0.530578, -0.000000, 0.885524, 0.464594, -0.599168, 0.371965, -0.708971),
+            //cframe: new CFrame(-24.273811, 25.471079, -3.335356, -0.800623, -0.278370, 0.530578, -0.000000, 0.885524, 0.464594, -0.599168, 0.371965, -0.708971),
+            cframe: new CFrame(-54.092693, 11.478745, 16.884146, -0.006555, 0.037952, -0.999266, 0.000000, 0.999285, 0.037954, 0.999983, 0.000249, -0.006553),
+            //cframe: new CFrame(-100.14649587302786, 34.3512245597494, -37.46941349351268, -0.21164429655182151, 0.1600321067809343, -0.9641558051146818, 0, 0.9865032998890692, 0.16374137933942473, 0.97734676125574, 0.034654929046717506, -0.20878779695107266),
+            //cframe: new CFrame(-88.36311913881765, 42.64794936923349, 37.01978557182523, 0.6762239645637755, 0.21397618444278912, -0.7049364100689899, 0, 0.9568890159401192, 0.29045380213237043, 0.7366961040684616, -0.19641182160057394, 0.6470712840065572),
+            //cframe: new CFrame(4.770395170195527, 8.321971200464198, 25.002222778908937, 0.7561017277967828, -0.08734964701266894, 0.6485986558646896, 0, 0.9910529243287365, 0.13346947658344863, -0.6544541062769182, -0.10091650185287775, 0.7493368284230119),
             nearPlaneZ: -0.1,
-            fieldOfView: 70
+            fieldOfView: 70,
+            //fieldOfView: 50,
         }
 
         const currentSettings = {
@@ -99,9 +181,8 @@
     <script type="module">
         import { initGpu } from "./scripts/webgpu.js";
         import { Raytracer } from "./scripts/raytracer.js";
-        import { runTriangulator } from "./scripts/triangulator.js";
+        import { runObjects } from "./scripts/objectify.js";
 
-        /** @type {WebGL2RenderingContext} */
         let gpu, raytracer;
 
         const setupGpu = async () => {
@@ -112,7 +193,7 @@
             raytracer = new Raytracer(gpu);
             raytracer.setup(constantSettings);
 
-            raytracer.objects = await runTriangulator("./part_info.json");
+            raytracer.objects = await runObjects("./resource/infos/part_info1.json");
 
             raytracer.build();
         }
@@ -133,19 +214,32 @@
 
             currentFrame++;
 
-            if (animate) requestAnimationFrame(run);
+            if (animate && running) requestAnimationFrame(run);
             //console.log(`done in ${(Date.now() - startTime) / 1000} seconds`);
         }
 
         function start() {
-            if (!running) {
-                running = true;
+            if (animate) {
+                if (!running) {
+                    running = true;
+                    document.getElementById("rtx-text").textContent = "ray tracer is running"
+                    run();
+                } else {
+                    running = false;
+                    document.getElementById("rtx-text").textContent = "ray tracer has stopped"
+                    if (mouseLock) {
+                        document.exitPointerLock();
+                        mouseLock = false;
+                    }
+                }
+            } else {
                 run();
+                document.getElementById("rtx-text").textContent = "ray tracer has rendered"
             }
         }
 
         canvas.addEventListener("click", async () => {
-            if (running) {
+            if (animate && running) {
                 await canvas.requestPointerLock();
             }
         });
@@ -154,7 +248,6 @@
             e = e || window.event;
             if (window.event.key === 'r' && gpuSetup) { // r
                 start();
-                document.getElementById("rtx-text").textContent = "RTX ON"
             }
         };
 
@@ -246,9 +339,13 @@
                 }
 
                 velocity = velocity.unit().mul(cameraSpeed * deltaTime * 25 * speedRate);
-                
+
                 currentCamPos = currentCamPos.add(velocity);
                 currentCFrame = new CFrame(currentCamPos).mul(CFrame_angles(0, rad(yaw), 0)).mul(CFrame_angles(rad(pitch), 0, 0));
+            }
+
+            if (!currentCFrame.equals(currentSettings.camCFrame)) {
+                currentFrame = 0;
             }
 
             currentSettings.camCFrame = currentCFrame;

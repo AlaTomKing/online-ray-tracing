@@ -2,6 +2,8 @@
 
 really cool ray tracing thingy using webgpu
 
+warning: very very laggy unless you have a good computer
+
 you should check out the [credits](https://github.com/AlaTomKing/online-ray-tracing/blob/main/credits.md) because uhh they are the reason i can do this
 
 ### controls
